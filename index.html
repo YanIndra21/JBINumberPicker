@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jegeg Bagus INSTIKI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-red-1: #b20c0c;
+        --bg-red-2: #e31a1a;
+        --gold-1: #ffe08a;
+        --gold-2: #d9a431;
+        --gold-3: #bb8226;
+        --white: #ffffff;
+        /* Variabel responsif agar selalu muat di viewport dan simetris */
+        --card-size: clamp(140px, 20vmin, 260px);
+        --grid-gap: clamp(18px, 4vmin, 56px);
+        --pill-bottom: clamp(10px, 1.6vmin, 16px);
+        /* Margin kiri-kanan tetap 8 cm */
+        --side-margin: 8cm;
+        /* Kalibrasi ukuran & jarak via script */
+        --gap-ratio: 0.12;   /* jarak dibanding lebar kartu (lebih kecil agar kartu bisa membesar) */
+        --density: 1.00;     /* seberapa rapat memanfaatkan ruang */
+        --card-min: 140;     /* px, batas bawah di script */
+        --card-max: 340;     /* px, batas atas di script */
+        --card-target: 250;  /* px, target kartu jika memungkinkan */
+        /* Margin bawah tambahan agar ada ruang di kaki layar */
+        --bottom-space: clamp(28px, 4vmin, 64px);
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: 'Montserrat', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--white);
+        background: #000; /* video akan menjadi latar sesungguhnya */
+        overflow: hidden; /* nonaktifkan scroll vertical */
+        overscroll-behavior: none;
+      }
+
+      /* Video background */
+      .bg-video {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -1; /* berada di belakang konten */
+      }
+
+      .wrap {
+        max-width: 100vw;
+        margin: 0 auto;
+        padding: 0 var(--side-margin) var(--bottom-space);
+        text-align: center;
+        min-height: 100vh;
+        display: grid;
+        align-content: center; /* pusatkan vertikal */
+        justify-content: center; /* pusatkan horizontal */
+      }
+
+      /* Top badges pill menggunakan gambar */
+      .pill-img {
+        /* Lebar mengikuti gambar referensi dan tetap responsif */
+        width: clamp(160px, 14vmin, 300px);
+        height: auto;
+        display: block;
+        margin: 0 auto var(--pill-bottom);
+        filter: drop-shadow(0 10px 18px #00000055);
+        border-radius: 999px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, var(--card-size));
+        gap: var(--grid-gap);
+        justify-content: center;
+        justify-items: center;
+        align-items: start;
+      }
+
+      .card {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1; /* gambar kamu square */
+        border-radius: clamp(18px, 2.5vw, 22px);
+        overflow: hidden; /* pastikan lekukan sudut memotong gambar */
+        /* gambar per kartu akan dipasang inline via style */
+        background-color: transparent;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        box-shadow: 0 clamp(8px, 2vw, 14px) clamp(18px, 3vw, 28px) #00000035;
+        display: grid;
+        place-items: center;
+        isolation: isolate;
+      }
+
+      .card.hidden {
+        /* Tetap mempertahankan slot grid agar barisan tidak bergeser */
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        backdrop-filter: blur(2px);
+      }
+      .overlay.show { display: flex; }
+      .overlay-card {
+        width: clamp(320px, 46vmin, 560px);
+        aspect-ratio: 1 / 1;
+        border-radius: clamp(18px, 2.5vw, 22px);
+        background-size: cover;
+        background-position: center;
+        box-shadow: 0 18px 32px #00000055;
+      }
+
+      /* Indikator ukuran viewport untuk debugging */
+      .debug-size {
+        position: fixed;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(0,0,0,0.65);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.3;
+        z-index: 100;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      /* === ANIMASI RANDOM PICK === */
+      .card.dim {
+        filter: brightness(0.55) saturate(0.8);
+        transition: filter 0.2s ease;
+      }
+
+      .card.spotlight {
+        filter: brightness(1.15) saturate(1.2);
+        box-shadow:
+          0 0 0 6px rgba(255, 215, 100, 0.25),
+          0 0 40px rgba(255, 215, 100, 0.85);
+        transform: scale(1.04);
+        transition: all 0.25s ease;
+        z-index: 5;
+      }
+
+
+      /* tidak perlu ornamen terpisah karena sudah menyatu di gambar */
+
+      /* angka manual dihapus karena sudah ada di gambar */
+
+      /* Layout tweaks for smaller screens */
+      @media (max-width: 1024px) {
+        .grid { grid-template-columns: repeat(4, var(--card-size)); }
+      }
+      @media (max-width: 768px) {
+        .grid { grid-template-columns: repeat(3, var(--card-size)); }
+      }
+      @media (max-width: 560px) {
+        .grid { grid-template-columns: repeat(2, var(--card-size)); }
+      }
+      @media (max-width: 360px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Video latar: ganti src ke file video kamu -->
+    <video class="bg-video" autoplay muted loop playsinline>
+      <source src="assets/bg.mp4" type="video/mp4" />
+    </video>
+    
+
+    <div class="wrap">
+      <!-- Gambar pill header yang kamu kirim -->
+      <img class="pill-img" src="assets/pill.png" alt="Header badges" />
+
+      <div class="grid" role="list" aria-label="Pilihan 1 sampai 20">
+        <div class="card" role="listitem" data-number="1" style="background-image:url('assets/1.png')"></div>
+        <div class="card" role="listitem" data-number="2" style="background-image:url('assets/2.png')"></div>
+        <div class="card" role="listitem" data-number="3" style="background-image:url('assets/3.png')"></div>
+        <div class="card" role="listitem" data-number="4" style="background-image:url('assets/4.png')"></div>
+        <div class="card" role="listitem" data-number="5" style="background-image:url('assets/5.png')"></div>
+        <div class="card" role="listitem" data-number="6" style="background-image:url('assets/6.png')"></div>
+        <div class="card" role="listitem" data-number="7" style="background-image:url('assets/7.png')"></div>
+        <div class="card" role="listitem" data-number="8" style="background-image:url('assets/8.png')"></div>
+        <div class="card" role="listitem" data-number="9" style="background-image:url('assets/9.png')"></div>
+        <div class="card" role="listitem" data-number="10" style="background-image:url('assets/10.png')"></div>
+        <div class="card" role="listitem" data-number="11" style="background-image:url('assets/11.png')"></div>
+        <div class="card" role="listitem" data-number="12" style="background-image:url('assets/12.png')"></div>
+        <div class="card" role="listitem" data-number="13" style="background-image:url('assets/13.png')"></div>
+        <div class="card" role="listitem" data-number="14" style="background-image:url('assets/14.png')"></div>
+        <div class="card" role="listitem" data-number="15" style="background-image:url('assets/15.png')"></div>
+        <div class="card" role="listitem" data-number="16" style="background-image:url('assets/16.png')"></div>
+        <div class="card" role="listitem" data-number="17" style="background-image:url('assets/17.png')"></div>
+        <div class="card" role="listitem" data-number="18" style="background-image:url('assets/18.png')"></div>
+        <div class="card" role="listitem" data-number="19" style="background-image:url('assets/19.png')"></div>
+        <div class="card" role="listitem" data-number="20" style="background-image:url('assets/20.png')"></div>
+      </div>
+      <div id="overlay" aria-hidden="true" class="overlay" role="dialog">
+        <div id="overlayCard" class="overlay-card" aria-label="Kartu besar"></div>
+      </div>
+      <div id="debugSize" class="debug-size" aria-live="polite" title="Ukuran viewport dan area konten"></div>
+      
+  </div>
+  <script>
+    (function() {
+      // --- Responsif: pastikan 20 kotak selalu muat tanpa scroll ---
+      const wrap = document.querySelector('.wrap');
+      const pill = document.querySelector('.pill-img');
+      const debugEl = document.getElementById('debugSize');
+      const rootStyle = document.documentElement.style;
+      const css = getComputedStyle(document.documentElement);
+      const GAP_RATIO = parseFloat(css.getPropertyValue('--gap-ratio')) || 0.24; // gap relatif thd ukuran kartu
+      const DENSITY = parseFloat(css.getPropertyValue('--density')) || 0.96; // tingkat pemanfaatan ruang
+      const CARD_MIN = parseFloat(css.getPropertyValue('--card-min')) || 120; // px
+      const CARD_MAX = parseFloat(css.getPropertyValue('--card-max')) || 280; // px
+      const CARD_TARGET = parseFloat(css.getPropertyValue('--card-target')) || null; // target kartu
+
+      function fitGrid() {
+        const cols = 5, rows = 4;
+        // Lebar tersedia adalah konten .wrap (tanpa padding kiri/kanan 8 cm)
+        let availW = window.innerWidth;
+        if (wrap) {
+          const wrapStyles = getComputedStyle(wrap);
+          const pl = parseFloat(wrapStyles.paddingLeft) || 0;
+          const pr = parseFloat(wrapStyles.paddingRight) || 0;
+          // clientWidth sudah termasuk padding; kurangi agar hanya area konten
+          availW = wrap.clientWidth - pl - pr;
+        }
+        const pillRect = pill ? pill.getBoundingClientRect() : { height: 0 };
+        const pillStyles = pill ? getComputedStyle(pill) : { marginBottom: '0' };
+        const pillBottom = parseFloat(pillStyles.marginBottom) || 0;
+        const bottomSpace = parseFloat(css.getPropertyValue('--bottom-space')) || 0;
+        const availH = window.innerHeight - pillRect.height - pillBottom - bottomSpace;
+
+        // Rumus: card * (cols + (cols-1)*GAP_RATIO) <= availW
+        const cardByWidth = (availW * DENSITY) / (cols + (cols - 1) * GAP_RATIO);
+        const cardByHeight = (availH * DENSITY) / (rows + (rows - 1) * GAP_RATIO);
+        let card = Math.min(cardByWidth, cardByHeight, CARD_MAX);
+        if (CARD_TARGET) card = Math.min(card, CARD_TARGET);
+        card = Math.max(CARD_MIN, card);
+        const gap = Math.max(20, Math.min(card * GAP_RATIO, 80));
+
+        rootStyle.setProperty('--card-size', `${Math.floor(card)}px`);
+        rootStyle.setProperty('--grid-gap', `${Math.floor(gap)}px`);
+
+        // Tampilkan ukuran untuk kamu lihat
+        if (debugEl) {
+          const vpW = window.innerWidth;
+          const vpH = window.innerHeight;
+          const info = `viewport: ${vpW}×${vpH}\nkonten: ${Math.round(availW)}×${Math.round(availH)}\ncard: ${Math.round(card)} gap: ${Math.round(gap)}`;
+          debugEl.textContent = info;
+        }
+      }
+
+      window.addEventListener('resize', fitGrid);
+      window.addEventListener('load', fitGrid);
+      fitGrid();
+      const overlay = document.getElementById('overlay');
+      const overlayCard = document.getElementById('overlayCard');
+      const cards = Array.from(document.querySelectorAll('.card'));
+      const cardMap = new Map(cards.map(el => [Number(el.dataset.number), el]));
+
+      const hidden = new Set();
+      let overlayNumber = null;
+      let lastPickedNumber = null;
+
+
+      // Buffer untuk mendukung angka 2 digit (10-20)
+      let digitBuffer = '';
+      let bufferTimer = null;
+      const BUFFER_MS = 450;
+
+      function setOverlay(number) {
+        overlayNumber = number;
+        overlayCard.style.backgroundImage = `url('assets/${number}.png')`;
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+      function closeOverlay() {
+        overlayNumber = null;
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+      function refreshHidden() {
+        cardMap.forEach((el, num) => {
+          el.classList.toggle('hidden', hidden.has(num));
+        });
+      }
+
+      function triggerNumber(n) {
+        if (!cardMap.has(n)) return; // guard
+
+        if (overlayNumber === null) {
+          if (hidden.has(n)) {
+            hidden.delete(n); // kembalikan kartu ke barisan
+            refreshHidden();
+          } else {
+            setOverlay(n); // tampilkan besar
+          }
+        } else {
+          if (overlayNumber === n) {
+            closeOverlay();
+            hidden.add(n); // sembunyikan dari barisan
+            refreshHidden();
+          } else {
+            setOverlay(n); // ganti kartu besar jika angka berbeda
+          }
+        }
+      }
+
+      function commitBuffer() {
+        if (!digitBuffer) return;
+        const n = Number(digitBuffer);
+        digitBuffer = '';
+        if (Number.isInteger(n) && n >= 1 && n <= 20) {
+          triggerNumber(n);
+        }
+      }
+
+      function handleDigit(key) {
+        // key berupa string '0'..'9'
+        digitBuffer += key;
+        clearTimeout(bufferTimer);
+        bufferTimer = setTimeout(commitBuffer, BUFFER_MS);
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          if (lastPickedNumber !== null) {
+              hidden.add(lastPickedNumber);   // sembunyikan kartu
+              refreshHidden();                // update grid
+              closeOverlay();                 // tutup overlay
+              lastPickedNumber = null;        // reset
+          }
+           startRandomPick();
+        }
+
+        // Abaikan jika ada modifier
+        if (e.altKey || e.ctrlKey || e.metaKey) return;
+        
+        if (e.key >= '0' && e.key <= '9') {
+          handleDigit(e.key);
+          return;
+        }
+
+        if (e.code && e.code.startsWith('Numpad')) {
+          const d = e.code.replace('Numpad', '');
+          if (d >= '0' && d <= '9') {
+            handleDigit(d);
+            return;
+          }
+        }
+
+        if (e.key === 'Escape') {
+          // keluar overlay tanpa menyembunyikan kartu
+          if (overlayNumber !== null) closeOverlay();
+        }
+      });
+
+    /* ===============================
+      RANDOM NUMBER PICK WITH ANIMATION
+    ================================= */
+
+    let rolling = false;
+    let rollInterval = null;
+
+    // Ambil kartu yang belum disembunyikan
+    function getAvailableCards() {
+      return cards.filter(c => !hidden.has(Number(c.dataset.number)));
+    }
+
+    function clearEffects() {
+      cards.forEach(c => {
+        c.classList.remove('spotlight', 'dim');
+      });
+    }
+
+    function startRandomPick(duration = 3000) {
+      if (rolling) return;
+      rolling = true;
+
+      const available = getAvailableCards();
+      if (available.length === 0) return;
+
+      // Gelapkan semua kartu
+      cards.forEach(c => c.classList.add('dim'));
+
+      let currentCard = null;
+
+      rollInterval = setInterval(() => {
+        if (currentCard) currentCard.classList.remove('spotlight');
+
+        currentCard = available[Math.floor(Math.random() * available.length)];
+        currentCard.classList.add('spotlight');
+      }, 120);
+
+      // Hentikan di angka terakhir
+      setTimeout(() => {
+        clearInterval(rollInterval);
+        rolling = false;
+
+        clearEffects();
+        currentCard.classList.add('spotlight');
+
+        const number = Number(currentCard.dataset.number);
+        lastPickedNumber = number;
+
+
+        // Tampilkan overlay besar (pakai fungsi kamu)
+        setTimeout(() => {
+          triggerNumber(number);
+        }, 400);
+
+      }, duration);
+    }
+
+    window.startRandomPick = startRandomPick;
+
+    })();
+  </script>
+  </body>
+</html>
