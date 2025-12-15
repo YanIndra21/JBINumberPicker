@@ -149,7 +149,7 @@
 
       /*Timer style*/
       .timer {
-        font-size: clamp(48px, 6vmin, 80px);
+        font-size: 200px;
         font-weight: 900;
         margin: 18px 0 24px;
         color: #ffe08a;
@@ -217,7 +217,7 @@
   justify-content: center;
   gap: 18px;
 
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.50);
   backdrop-filter: blur(2px);
 
   opacity: 0;
@@ -259,6 +259,44 @@
       @media (max-width: 360px) {
         .grid { grid-template-columns: 1fr; }
       }
+
+
+      @keyframes pulseSlow {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulseMedium {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulseFast {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.timer-float.pulse-30 {
+  animation: pulseSlow 1.2s infinite;
+}
+
+.timer-float.pulse-15 {
+  animation: pulseMedium 0.8s infinite;
+}
+
+.timer-float.pulse-5 {
+  animation: pulseFast 0.4s infinite;
+}
+
+.timer-float.finish {
+  animation: none !important;
+  transform: scale(1.35);
+  color: #ff6b6b;
+}
+
     </style>
   </head>
   <body>
@@ -274,9 +312,6 @@
 
 <div id="timerOverlay" class="timer-overlay">
   <div id="timer" class="timer-float">45</div>
-  <button id="resetTimerBtn" class="reset-btn">RESET TIMER</button>
-
-
 </div>
 
 
@@ -380,8 +415,6 @@
   overlay.classList.remove('show');
   overlay.setAttribute('aria-hidden', 'true');
 
-  // ⏱️ mulai timer setelah overlay ditutup
-  startTimer();
 }
 
       function refreshHidden() {
@@ -429,15 +462,20 @@
 
       window.addEventListener('keydown', (e) => {
 
-        if (e.code === 'Space') {
-    e.preventDefault();
-    stopTimer();
-  }
+     if (e.code === 'Space') {
+  e.preventDefault();
+  togglePauseTimer();
+}
 
-  // 🔄 RESET + CLOSE timer
-  if (e.key.toLowerCase() === 'p') {
-    resetAndCloseTimer();
-  }
+if (e.key.toLowerCase() === 't') {
+  startTimer();
+}
+
+
+if (e.key.toLowerCase() === 'p') {
+  resetAndCloseTimer();
+}
+
 
         if (e.key === 'Enter') {
           if (lastPickedNumber !== null) {
@@ -465,12 +503,17 @@
           }
         }
 
-        if (e.key === 'Escape') {
-          hidden.add(lastPickedNumber);   // sembunyikan kartu
-              refreshHidden();                // update grid
-              closeOverlay();                 // tutup overlay
-              lastPickedNumber = null;
-        }
+      if (e.key === 'Escape') {
+  if (lastPickedNumber !== null) {
+    hidden.add(lastPickedNumber);
+    refreshHidden();
+    closeOverlay();
+
+    showTimerReady(); // ✅ PENTING
+    lastPickedNumber = null;
+  }
+}
+
       });
 
     /* ===============================
@@ -532,74 +575,100 @@
 
     window.startRandomPick = startRandomPick;
    
-    // TIMER
-  const timerOverlay = document.getElementById('timerOverlay');
+  /* ===============================
+   TIMER (SAMA DENGAN TIMER KHUSUS)
+================================ */
+
+const timerOverlay = document.getElementById('timerOverlay');
 const timerEl = document.getElementById('timer');
-const resetBtn = document.getElementById('resetTimerBtn');
 
 let timerInterval = null;
 let timeLeft = 45;
 let timerRunning = false;
 let timerPaused = false;
-let timerStopped = false; 
 
-resetBtn.addEventListener('click', stopAndResetTimer);
+function showTimerReady() {
+  timerOverlay.classList.add('show');
+  timerEl.textContent = timeLeft;
+  timerEl.style.transform = 'scale(1)';
+}
+
+
+
+function renderTimer() {
+  timerEl.textContent = timeLeft;
+
+  // WARNA BERDASARKAN SISA WAKTU
+  if (timeLeft > 30) {
+    timerEl.style.color = '#ffe08a'; // emas tenang
+  } else if (timeLeft > 15) {
+    timerEl.style.color = '#ffe08a'; // mulai panas
+  } else if (timeLeft > 5) {
+    timerEl.style.color = '#ffe08a'; // tegang
+  } else {
+    timerEl.style.color = '#ffe08a'; // kritis
+  }
+}
+
 
 function startTimer() {
   if (timerRunning) return;
 
   timerRunning = true;
   timerPaused = false;
-  timerStopped = false;
-
   timeLeft = 45;
-  timerEl.textContent = timeLeft;
-  timerEl.style.color = '#ffe08a';
 
   timerOverlay.classList.add('show');
+  renderTimer();
 
   timerInterval = setInterval(() => {
-    if (timerPaused || timerStopped) return;
+    if (timerPaused) return;
 
     timeLeft--;
-    timerEl.textContent = timeLeft;
-
-    if (timeLeft <= 10) {
-      timerEl.style.color = '#ffb3b3';
-    }
+    renderTimer();
 
     if (timeLeft <= 0) {
-      stopTimer(); // ⏹️ berhenti tapi overlay tetap
+      clearInterval(timerInterval);
+      timerInterval = null;
+      timerRunning = false;
     }
   }, 1000);
 }
 
-
-function stopTimer() {
+function togglePauseTimer() {
   if (!timerRunning) return;
-
-  clearInterval(timerInterval);
-  timerInterval = null;
-
-  timerStopped = true;
-  timerRunning = false;
+  timerPaused = !timerPaused;
 }
 
-function resetAndCloseTimer() {
+function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
 
+  timeLeft = 45;
+  timerRunning = false;
+  timerPaused = false;
+
+  renderTimer();
+}
+function resetAndCloseTimer() {
+  // hentikan interval
+  clearInterval(timerInterval);
+  timerInterval = null;
+
+  // reset state
   timerRunning = false;
   timerPaused = false;
   timerStopped = false;
 
+  // reset waktu
   timeLeft = 45;
   timerEl.textContent = timeLeft;
   timerEl.style.color = '#ffe08a';
+  timerEl.style.transform = 'scale(1)';
 
+  // TUTUP overlay timer
   timerOverlay.classList.remove('show');
 }
-
 
     
     })();
